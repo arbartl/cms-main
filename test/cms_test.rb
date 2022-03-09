@@ -23,6 +23,14 @@ class AppTest < Minitest::Test
     end
   end
 
+  def session
+    last_request.env["rack.session"]
+  end
+
+  def admin_session
+    { "rack.session" => { username: "admin" } }
+  end
+
   def test_index
     create_document "about.md"
     create_document "changes.txt"
@@ -48,13 +56,7 @@ class AppTest < Minitest::Test
   def test_nonexistent
     get "/something.txt"
     assert_equal 302, last_response.status
-
-    get last_response["Location"]
-    assert_equal 200, last_response.status
-    assert_includes last_response.body, "does not exist"
-
-    get "/"
-    refute_includes last_response.body, "does not exist"
+    assert_equal "'something.txt' does not exist.", session[:message]
   end
 
   def test_markdown
@@ -67,7 +69,7 @@ class AppTest < Minitest::Test
 
   def test_edit
     create_document "changes.txt", "no content"
-    get "/changes.txt/edit"
+    get "/changes.txt/edit", {}, admin_session
     assert_equal 200, last_response.status
     assert_includes last_response.body, "<textarea"
     assert_includes last_response.body, %q(<button type="submit")
@@ -76,13 +78,10 @@ class AppTest < Minitest::Test
   def test_updating
     create_document "changes.txt"
 
-    post "/changes.txt", content: "new content"
+    post "/changes.txt", { content: "new content" }, admin_session
 
     assert_equal 302, last_response.status
-
-    get last_response["Location"]
-
-    assert_includes last_response.body, "has been successfully updated"
+    assert_equal "'changes.txt' has been successfully updated!", session[:message]
 
     get "/changes.txt"
     assert_equal 200, last_response.status
@@ -90,37 +89,54 @@ class AppTest < Minitest::Test
   end
 
   def test_new
-    get "/new"
+    get "/new", {}, admin_session
     assert_equal 200, last_response.status
     assert_includes last_response.body, "<input"
   end
 
   def test_create_new
-    post "/new", name: "test"
-    assert_includes last_response.body, "File must be a"
+    post "/new", { name: "test" }, admin_session
+    assert_includes last_response.body, "File must be a '.txt' or '.md' file."
 
     post "/new", name: ""
-    assert_includes last_response.body, "name is required"
+    assert_includes last_response.body, "A name is required"
     
     post "/new", name: "test.txt"
     assert_equal 302, last_response.status
-
-    get last_response["Location"]
-    assert_includes last_response.body, "test.txt"
+    assert_equal "'test.txt' was created successfully!", session[:message]
   end
 
   def test_delete
     create_document "test.txt"
 
-    post "/test.txt/delete"
+    post "/test.txt/delete", {}, admin_session
     assert_equal 302, last_response.status
-
-    get last_response["Location"]
-
-    assert_equal 200, last_response.status
-    assert_includes last_response.body, "successfully deleted"
+    assert_equal "'test.txt' has been successfully deleted!", session[:message]
   end
 
+  def test_signin_valid
+    post "/users/signin", username: "admin", password: "secret"
+
+    assert_equal 302, last_response.status
+    assert_equal "Welcome!", session[:message]
+    assert_equal "admin", session[:username]
+  end
+
+  def test_signin_invalid
+    post "/users/signin", username: "admin", password: "password"
+
+    assert_equal 422, last_response.status
+    assert_includes last_response.body, "Invalid Credentials"
+    assert_nil session[:username]
+  end
+
+  def test_signout
+    post "/users/signout"
+
+    assert_equal 302, last_response.status
+    assert_equal "You have been signed out.", session[:message]
+    assert_nil session[:username]
+  end
 
 
   def teardown

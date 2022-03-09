@@ -2,6 +2,8 @@ require "sinatra"
 require "sinatra/reloader"
 require "tilt/erubis"
 require "redcarpet"
+require "yaml"
+require "bcrypt"
 
 root = File.expand_path("..", __FILE__)
 
@@ -15,6 +17,15 @@ def data_path
   else
     File.expand_path("../data", __FILE__)
   end
+end
+
+def load_user_credentials
+  credentials_path = if ENV["RACK_ENV"] == "test"
+    File.expand_path("../test/users.yml", __FILE__)
+  else
+    File.expand_path("../users.yml",__FILE__)
+  end
+  YAML.load_file(credentials_path)
 end
 
 helpers do
@@ -46,9 +57,23 @@ get "/users/signin" do
   erb :signin
 end
 
+def signed_in?
+  session[:username]
+end
+
+def redirect_to_signin
+  session[:message] = "You must be signed in to do that."
+  redirect "/"
+end
+
 def valid_user?(user, password)
-  user == "admin" &&
-  password == "secret"
+  credentials = load_user_credentials
+  
+  if credentials.include?(user)
+    BCrypt::Password.new(credentials[user]) == password
+  else
+    false
+  end
 end
 
 post "/users/signin" do
@@ -74,6 +99,11 @@ end
 
 # Create a new document
 get "/new" do
+
+  unless signed_in?
+    redirect_to_signin
+  end
+
   erb :new
 end
 
@@ -85,6 +115,10 @@ end
 post "/new" do
   filename = params[:name].strip
   error = filename_error(filename)
+
+  unless signed_in?
+    redirect_to_signin
+  end
 
   if error
     case error
@@ -103,10 +137,10 @@ end
 
 # View file in browser
 get "/:file_name" do
-  file = params[:file_name]
+  file = File.basename(params[:file_name])
   file_path = File.join(data_path, file)
   error = !File.file?(root + "/data/" + file)
-  
+
   if error
     session[:message] = "'#{file}' does not exist."
     redirect "/"
@@ -120,12 +154,21 @@ get "/:file_name/edit" do
   @file = params[:file_name]
   file_path = File.join(data_path, @file)
   @content = File.read(file_path)
+
+  unless signed_in?
+    redirect_to_signin
+  end
+
   erb :edit
 end
 
 post "/:file_name" do
   @file = params[:file_name]
   file_path = File.join(data_path, @file)
+
+  unless signed_in?
+    redirect_to_signin
+  end
 
   File.write(file_path, params[:content])
 
@@ -137,6 +180,10 @@ end
 post "/:file_name/delete" do
   @file = params[:file_name]
   file_path = File.join(data_path, @file)
+
+  unless signed_in?
+    redirect_to_signin
+  end
 
   File.delete(file_path)
 

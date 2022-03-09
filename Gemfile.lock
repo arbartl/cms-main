@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    bcrypt (3.1.16)
     erubis (2.7.0)
     minitest (5.15.0)
     multi_json (1.15.0)
@@ -25,17 +26,20 @@ GEM
       sinatra (= 2.2.0)
       tilt (~> 2.0)
     tilt (2.0.10)
+    yaml (0.2.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
+  bcrypt
   erubis
   minitest
   rack-test
   redcarpet
   sinatra
   sinatra-contrib
+  yaml
 
 BUNDLED WITH
    2.1.4
