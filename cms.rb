@@ -41,6 +41,37 @@ def load_file_content(path)
   end
 end
 
+# Sign In Page
+get "/users/signin" do
+  erb :signin
+end
+
+def valid_user?(user, password)
+  user == "admin" &&
+  password == "secret"
+end
+
+post "/users/signin" do
+  user = params[:username]
+  password = params[:password]
+
+  if valid_user?(user, password)
+    session[:message] = "Welcome!"
+    session[:username] = user
+    redirect "/"
+  else
+    session[:message] = "Invalid Credentials"
+    status 422
+    erb :signin
+  end
+end
+
+post "/users/signout" do
+  session.delete(:username)
+  session[:message] = "You have been signed out."
+  redirect "/"
+end
+
 # Create a new document
 get "/new" do
   erb :new
@@ -112,4 +143,6 @@ post "/:file_name/delete" do
   session[:message] = "'#{@file}' has been successfully deleted!"
   redirect "/"
 end
+
+
 

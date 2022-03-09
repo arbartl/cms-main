@@ -109,6 +109,19 @@ class AppTest < Minitest::Test
     assert_includes last_response.body, "test.txt"
   end
 
+  def test_delete
+    create_document "test.txt"
+
+    post "/test.txt/delete"
+    assert_equal 302, last_response.status
+
+    get last_response["Location"]
+
+    assert_equal 200, last_response.status
+    assert_includes last_response.body, "successfully deleted"
+  end
+
+
 
   def teardown
     FileUtils.rm_rf(data_path)
